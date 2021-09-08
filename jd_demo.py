@@ -20,6 +20,7 @@ import csv
 def get_page(url):
     global TIMESLEEP
     global browser
+    global wait
 
     browser.get(url)
     submit = wait.until(EC.presence_of_element_located((By.XPATH, '//div[contains(@class,"tab-main")]/ul/li[5]')))
@@ -62,6 +63,7 @@ def crawl_all_page_url():
     global TIMESLEEP
     global cookie_info
     global browser
+    global wait
 
     browser.get('https://www.jd.com/allSort.aspx')
 
@@ -69,12 +71,16 @@ def crawl_all_page_url():
     for cookieeee in cookie_info:
         browser.add_cookie(cookie_dict=cookieeee)
 
+    time.sleep(TIMESLEEP)
+
+    browser.refresh()
+
     wait.until(EC.presence_of_element_located(
         (By.XPATH, '/html/body/div[5]/div[2]/div[1]/div[2]/div[2]/div[9]/div[2]/div[3]')))
 
     CASE = [] # 存储所有需要获取的特型数据
     for i in range(1):  # 海鲜水产
-        initcase = '/html/body/div[5]/div[2]/div[1]/div[2]/div[2]/div[9]/div[2]/div[3]/dl[4]/dd/a[{}]'.format(i + 1)
+        initcase = '/html/body/div[5]/div[2]/div[1]/div[2]/div[2]/div[9]/div[2]/div[3]/dl[3]/dd/a[{}]'.format(i + 1)
         CASE.append(initcase)
     # 规则只要更改range里面的值和dl[]里面的值，可高度扩展
 
@@ -85,19 +91,24 @@ def crawl_all_page_url():
         # selenium执行时并不会自动切换到新开的页签或者窗口上，还会停留在之前的窗口中，所以两次打印的句柄都一样。新开窗口后必须通过脚本来进行句柄切换，才能正确操作相应窗口中的元素
         handle = browser.current_window_handle
         handles = browser.window_handles
+        
         for newhandle in handles:
             if newhandle != handle:
                 browser.switch_to.window(newhandle)
+        
         time.sleep(TIMESLEEP)
-        wait.until(EC.presence_of_element_located((By.XPATH, '//div[@id="plist"]/ul[contains(@class,"gl-warp")]')))
+
+        wait.until(EC.presence_of_element_located((By.XPATH, '//div[@id="J_goodsList"]/ul[contains(@class,"gl-warp")]')))
+
         doc = pq(browser.page_source, parser='html')
 
         # 读取所有商品的连接
-        for li in list(doc('div#plist ul.gl-warp li').items())[:CATEGORY_NUM]:
-            merUrl = 'https:' + str(li('div div.p-commit-n strong a').attr('href')).replace('#comment', '')
+        for li in list(doc('div#J_goodsList ul.gl-warp li').items())[:CATEGORY_NUM]:
+            merUrl = 'https:' + str(li('div div.p-commit strong a').attr('href')).replace('#comment', '')
             ALL_PAGE_URL.append(merUrl)
 
         time.sleep(TIMESLEEP)
+
         browser.close()
         browser.switch_to.window(handle)
 
@@ -106,6 +117,10 @@ def crawl_all_page_url():
 创建新的csv文件
 """
 def csv_create():
+    global FILENAME_MER
+    global fieldnames_merinfo
+    global ENCODING
+
     with open(FILENAME_MER, 'w', encoding=ENCODING, newline='') as f:
         writer = csv.writer(f)
         writer.writerow(fieldnames_merinfo)
@@ -115,6 +130,10 @@ def csv_create():
 将商品信息写入csv
 """
 def save_csv_merinfo(item):
+    global FILENAME_MER
+    global fieldnames_merinfo
+    global ENCODING
+
     with open(FILENAME_MER, 'a', encoding=ENCODING, newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames_merinfo)
         writer.writerow(item)
@@ -122,11 +141,8 @@ def save_csv_merinfo(item):
 
 if __name__ == '__main__':
 
-    browser = webdriver.PhantomJS()  # selenium模拟浏览器
-    wait = WebDriverWait(browser, 20)  # 等待20s浏览器驱动响应
-
     # 用户自定义配置区********************************
-    CATEGORY_NUM = 100  # 每个品类获取的商品数量，暂定100，想统计多少改这里就行（比如：鱼类，会获取100个商品）
+    CATEGORY_NUM = 1  # 每个品类获取的商品数量，暂定100，想统计多少改这里就行（比如：鱼类，会获取100个商品）
     TIMESLEEP = 2   # 睡眠间隔
     FILENAME_MER = 'jd.csv'  # 商品信息的文件名
     ENCODING = 'UTF-8'  # 保存的CSV的编码
@@ -148,6 +164,12 @@ if __name__ == '__main__':
 
     # 爬取商品信息
     ALL_PAGE_URL = []  # 所有的网页链接
+
+    # browser = webdriver.PhantomJS()  # selenium模拟浏览器
+    browser = webdriver.Chrome()
+
+    wait = WebDriverWait(browser, 20)  # 等待20s浏览器驱动响应
+
     crawl_all_page_url()  # 抓商品链接
 
     for page_url in ALL_PAGE_URL:
